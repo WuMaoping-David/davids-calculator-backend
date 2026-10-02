@@ -2,11 +2,11 @@
 
 ## Public deployment
 
-The repository includes a multi-stage Dockerfile using JDK 17 to build the Java 8-compatible sources. On Render, create a Docker Web Service, use `/api/health` as its health check, and mount persistent storage at `/var/data`. Set `DB_PATH=/var/data/calculator` and `CORS_ORIGINS` to the exact frontend HTTPS origin. The Dockerfile listens on `0.0.0.0`; the platform supplies `PORT`. A paid Render service with a persistent disk is required to preserve the current file-based H2 database across restarts and deploys. Review recurring charges before creating the service. See [PUBLIC_DEPLOYMENT.md](PUBLIC_DEPLOYMENT.md) for the complete procedure. Source publication does not establish public service availability.
+Use a Render Free Docker Web Service and a Neon Free PostgreSQL database, without a Render disk. Set `/api/health` as the health check and configure the remote database environment variables below. The Dockerfile uses Java 17, binds to `0.0.0.0`, and accepts the platform `PORT`. See [PUBLIC_DEPLOYMENT.md](PUBLIC_DEPLOYMENT.md) for the complete free deployment procedure. Local startup uses H2 when no remote URL is configured. Source publication alone does not establish public service availability.
 
 ## Project introduction
 
-This repository provides the independent Java HTTP API for David's calculator. It evaluates standard and scientific expressions, saves successful results in an H2 database, retrieves history, deletes individual records, and clears all history on request. The browser interface is hosted separately and performs no core mathematical evaluation.
+This repository provides the independent Java HTTP API for David's calculator. It evaluates standard and scientific expressions, saves successful results in local H2 or remote PostgreSQL, retrieves history, deletes individual records, and clears all history on request. The browser interface is hosted separately and performs no core mathematical evaluation.
 
 The current version focuses on scientific calculation. Full inverse-function names are `arcsin`, `arccos`, and `arctan`. Number-base and unit-conversion services have been removed; their former endpoints return 404. Existing conversion history is retained as archived data rather than deleted during an upgrade.
 
@@ -17,7 +17,7 @@ The current version focuses on scientific calculation. Full inverse-function nam
 | Language and server | Java, with JDK `HttpServer` |
 | Expression evaluation | Dedicated recursive-descent parser; no script engine or arbitrary-code execution |
 | JSON | Gson **2.13.2** |
-| Persistence | JDBC and embedded H2 **2.2.224**, using a file database |
+| Persistence | JDBC, embedded H2 **2.2.224** locally, and PostgreSQL JDBC **42.7.13** for cloud persistence |
 | Primary build workflow | PowerShell scripts invoking `javac` and `java` |
 | Optional build workflow | Maven, using `pom.xml` |
 
@@ -25,11 +25,11 @@ The current version focuses on scientific calculation. Full inverse-function nam
 
 - A full **JDK 8 or newer**, with both `java` and `javac` on `PATH`. The project has been exercised with JDK 8. A JRE alone cannot run the source-build workflow.
 - **Windows with PowerShell 5.1 or newer** for the supplied scripts. Maven offers an alternative build route on other operating systems.
-- Internet access to Maven Central on the first script build to download the two pinned dependency JARs. Later builds reuse checksum-verified files in `lib/`.
+- Internet access to Maven Central on the first script build to download the three pinned dependency JARs. Later builds reuse checksum-verified files in `lib/`.
 - A writable database directory and a free backend port, default **8080**.
 - For full browser use, the separate frontend, normally served on port **5173**.
 
-No separate database server, H2 console, Node.js installation, or application server is required. Python 3 is only needed for the optional HTTP integration suite included in the combined workspace.
+The local H2 setup requires no separate database server, H2 console, Node.js installation, or application server. Cloud deployment uses a separately provisioned PostgreSQL database. Python 3 is only needed for the optional HTTP integration suite included in the combined workspace.
 
 ## Installation method
 
@@ -47,7 +47,7 @@ javac -version
 .\build.ps1
 ```
 
-`build.ps1` creates `lib/` and `target/classes/`, downloads H2 2.2.224 and Gson 2.13.2 if missing, verifies their SHA-256 hashes, and compiles UTF-8 Java sources. A checksum mismatch stops the build. The dependency versions and expected hashes are recorded in the script; do not substitute a differently versioned JAR without updating and validating the project.
+`build.ps1` creates `lib/` and `target/classes/`, downloads H2 2.2.224, Gson 2.13.2, and PostgreSQL JDBC 42.7.13 if missing, verifies their SHA-256 hashes, and compiles UTF-8 Java sources. A checksum mismatch stops the build. The dependency versions and expected hashes are recorded in the script; do not substitute a differently versioned JAR without updating and validating the project.
 
 The build itself does not initialize the database. Database initialization occurs when the application starts.
 
@@ -97,6 +97,10 @@ Set these environment variables in the terminal **before** running `run.ps1`:
 | `BIND_ADDRESS` | `127.0.0.1` | Listening interface; default access is local only |
 | `DB_PATH` | `./data/calculator` | Database file prefix; omit the `.mv.db` suffix and do not include a semicolon |
 | `CORS_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated allowed frontend origins, without trailing slashes |
+| `DATABASE_URL` | Unset | PostgreSQL JDBC URL starting with `jdbc:postgresql://`; when set, overrides H2 |
+| `DATABASE_USER` | Unset | PostgreSQL role; backend configuration only |
+| `DATABASE_PASSWORD` | Unset | PostgreSQL role password; never put it in frontend files or GitHub |
+| `REQUIRE_REMOTE_DATABASE` | Unset | Set `true` in cloud deployment to reject startup without `DATABASE_URL` |
 
 A custom local setup, using frontend port 5174 and backend port 8081:
 
@@ -114,14 +118,14 @@ The combined workspace's root `start.ps1` deliberately applies fixed local defau
 
 ## Database initialization method
 
-The first application startup automatically:
+With no `DATABASE_URL`, the first application startup automatically:
 
 1. Creates the parent directory for `DB_PATH` if necessary.
 2. Opens or creates the H2 file database.
 3. Creates `calculation_history` if it does not exist.
 4. Adds missing metadata columns from older schemas and initializes legacy calculation parameters.
 
-No manual `CREATE DATABASE`, SQL import, or seed data is required. The default file is **`data/calculator.mv.db`** inside this repository. The embedded connection uses the application's internal `sa` user with an empty password; there is no database credential setting in the frontend, and no database network listener or console is started.
+No manual `CREATE DATABASE`, SQL import, or seed data is required. The default file is **`data/calculator.mv.db`** inside this repository. The embedded connection uses the application's internal `sa` user with an empty password; database credentials are never configured in the frontend, and no database network listener or console is started.
 
 ```sql
 CREATE TABLE IF NOT EXISTS calculation_history (
@@ -133,6 +137,8 @@ CREATE TABLE IF NOT EXISTS calculation_history (
   parameters VARCHAR(4096)
 );
 ```
+
+For PostgreSQL, first create a database through Neon or another provider and configure the three database variables. Startup connects over JDBC and creates the same table and missing columns automatically; no seed data is needed. Use certificate-verified TLS as described in PUBLIC_DEPLOYMENT.md. PostgreSQL data persists in the remote database independently of the Render filesystem. Local H2 data is not automatically imported.
 
 The schema is shown for reference; startup executes it automatically. IDs identify records, results are strings, timestamps are UTC, and `parameters` stores the original expression and angle mode. Existing records survive initialization and migration.
 
@@ -260,7 +266,7 @@ The suites cover precedence, scientific domains, angle modes, precision, express
 
 The current verification recorded 104 parser checks, 26 database checks, and 911 HTTP integration assertions passing. These are check counts, not distinct user-scenario counts.
 
-The project is ready for local use. Public hosting, separate frontend/backend GitHub repositories, and the final assignment blog remain separate delivery steps. Public deployment should configure HTTPS and appropriate frontend origins, and decide whether per-user history and authentication are needed.
+Local H2 checks are complete. PostgreSQL and public hosting require separate cloud acceptance checks; local test results do not prove a cloud deployment works. The public source repositories are linked in PUBLIC_DEPLOYMENT.md. Public deployment should configure HTTPS and appropriate frontend origins, and decide whether per-user history and authentication are needed.
 
 ## Troubleshooting and other operating information
 
@@ -279,7 +285,7 @@ The project is ready for local use. Public hosting, separate frontend/backend Gi
 
 When started with `run.ps1`, logs appear in that terminal. The combined launcher instead writes logs under its root `.runtime/` directory. Stop the service before changing dependency versions or performing file-level database maintenance.
 
-For public deployment, configure a suitable interface binding, HTTPS through a hosting platform or reverse proxy, the actual frontend origin, and durable storage for `DB_PATH`. The frontend API URL must be reachable by visitors. The local preview and repository source links do not constitute a public deployment; no public service URL is claimed here.
+For public deployment, configure a suitable interface binding, HTTPS through a hosting platform or reverse proxy, the actual frontend origin, and a remote PostgreSQL database for durable cloud history. The frontend API URL must be reachable by visitors. The local preview and repository source links do not constitute a public deployment; no public service URL is claimed here.
 
 History is shared: there are no accounts or per-user access controls. A deployment requiring private history must add authentication and authorization. A permitted client can clear the shared database history. Stop/restart persistence is tested; it does not guarantee recovery from every hardware or power failure.
 

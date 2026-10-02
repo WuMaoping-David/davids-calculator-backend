@@ -1,33 +1,53 @@
-# Public deployment of David's calculator
+# Free public deployment of David's calculator
 
-The frontend and Java backend are deployed independently. Keep a persistent disk for the H2 database. A public source repository alone is not a running service.
+Deploy the static frontend and Java backend separately on Render, and store cloud history in Neon PostgreSQL. Select Free plans only. No Render disk is needed. Local startup continues to use embedded H2. Publishing source on GitHub does not itself run the application.
 
-## Backend on Render
+## Neon database
 
-Create a Web Service from the backend repository. Select Docker with `Dockerfile` at the repository root. Leave the Docker command unset. Set the health check path to `/api/health`.
+Use the Calculator project on the Neon Free plan. Obtain the database name, role, password, and pooled endpoint from Connect. Do not reset the password or publish credentials. The backend initializes its table automatically. Local H2 records are not automatically copied into PostgreSQL.
 
-Choose a paid service that supports persistent disks. Review the actual recurring service and storage price in the dashboard before creating it. Mount a persistent disk at `/var/data` and set `DB_PATH=/var/data/calculator`. The Dockerfile sets `BIND_ADDRESS=0.0.0.0`; Render supplies `PORT`.
+## Render backend
 
-Set `CORS_ORIGINS` to the exact frontend HTTPS origin once the static site address is known. Do not include a trailing slash. Before that address exists, use `https://example.invalid` to avoid allowing an unintended browser origin. Copy the actual backend HTTPS origin after the deploy is live.
+Create a Free Docker Web Service from `WuMaoping-David/davids-calculator-backend`, branch `main`, with the root Dockerfile. Leave the Docker command unset and set health check path `/api/health`. The image uses Java 17 and binds to `0.0.0.0`; Render supplies `PORT`.
 
-## Frontend on Render
+| Backend environment variable | Value |
+|---|---|
+| `DATABASE_URL` | `jdbc:postgresql://YOUR_NEON_HOST/neondb?sslmode=verify-full&sslfactory=org.postgresql.ssl.DefaultJavaSSLFactory&connectTimeout=15&socketTimeout=30` |
+| `DATABASE_USER` | The role shown by Neon |
+| `DATABASE_PASSWORD` | The role password, saved only in the backend environment |
+| `REQUIRE_REMOTE_DATABASE` | `true`, preventing accidental fallback to ephemeral H2 |
+| `CORS_ORIGINS` | The exact frontend HTTPS origin, without a trailing slash |
 
-Create a Static Site from the frontend repository. Use `node build-render.mjs` as the build command and `dist` as the publish directory. Set `API_BASE_URL` to the actual backend HTTPS origin, without `/api` or another path. The build generates production `config.js`; the local configuration remains unchanged.
+Replace the host and database name with actual values. A raw `postgresql://` URI is not a JDBC URL. Keep credentials out of GitHub, frontend files, screenshots, and the blog. TLS verifies the server certificate and hostname using the Java trust store. Before the frontend address exists, set CORS to `https://example.invalid`. Deploy and record the actual backend origin. The database role must be allowed to create and modify the application table. History lives in Neon independently of Render restarts and redeploys.
 
-Set the backend `CORS_ORIGINS` to the actual static-site origin and redeploy the backend. Open the frontend HTTPS URL on another network.
+## Render frontend
 
-## Verification
+Create a free Static Site from `WuMaoping-David/davids-calculator-frontend`, branch `main`. Set build command `node build-render.mjs`, publish directory `dist`, and `API_BASE_URL` to the backend HTTPS origin, without `/api` or another path. The build generates production `config.js` with a 120-second timeout. Local configuration remains unchanged with a ten-second timeout. No npm dependencies are needed.
 
-Check the public backend `/api/health`. Calculate `0.1+0.2` and `(2+3)*4`, then check scientific DEG/RAD functions. Reload the frontend and confirm history remains. Delete one disposable entry. Clear only disposable demonstration history. Save another entry, restart the backend, and confirm its ID, expression, result, and parameters persist. Keep the service available throughout grading.
+Update backend `CORS_ORIGINS` to the actual frontend origin and apply the change. Visitors open the frontend URL rather than the backend root or localhost.
 
-This release has shared history rather than separate user accounts. All visitors see the same saved records and can use the history deletion features. Do not enter private information in expressions.
+## Verification and operation
 
-## Publication record
+Check `/api/health`, including database access. Verify decimals, parentheses, DEG/RAD functions, and English errors. Refresh and confirm history remains. Delete only disposable demonstration entries. Save an entry, restart the backend, and verify its ID, expression, result, and parameters persist in PostgreSQL. Report cloud verification separately from local H2 tests.
 
-Record actual verified repository and service URLs here after publication. Do not represent example or planned URLs as working services. Update the assignment blog with those verified URLs and deployment screenshots.
+Free services have usage quotas and may suspend when idle. The first request can take longer while services wake. A timeout does not prove a calculation was not saved: refresh history before retrying. Check current quotas in provider dashboards before grading; do not select paid upgrades or disks without approval.
+
+History is shared, with no user accounts. All visitors can read and delete records. CORS is not authentication. Use non-private assignment expressions.
+
+## Troubleshooting
+
+| Symptom | Action |
+|---|---|
+| Offline after an idle period | Allow the backend to wake and retry the health check |
+| Backend startup fails | Check JDBC URL, role/password, TLS, and Neon availability in Render logs |
+| Healthy API but browser requests fail | Match `API_BASE_URL` and the exact CORS origin |
+| History missing after deployment | Confirm remote database settings; do not use ephemeral H2 |
+| Free quota warning | Inspect usage and applicable resets; do not upgrade automatically |
 
 ## Official documentation
 
-- https://render.com/docs/docker
-- https://render.com/docs/static-sites
-- https://render.com/docs/disks
+- [Render Docker deployments](https://render.com/docs/docker)
+- [Render static sites](https://render.com/docs/static-sites)
+- [Render free services](https://render.com/docs/free)
+- [Neon connections](https://neon.com/docs/connect/connect-from-any-app)
+- [PostgreSQL JDBC TLS](https://jdbc.postgresql.org/documentation/ssl/)

@@ -52,8 +52,14 @@ public final class CalculatorApplication {
     System.setProperty("sun.net.httpserver.maxReqTime", "30");
     System.setProperty("sun.net.httpserver.maxRspTime", "30");
     System.setProperty("sun.net.httpserver.idleInterval", "30");
+    String remoteDatabase = System.getenv("DATABASE_URL");
+    if ("true".equalsIgnoreCase(System.getenv("REQUIRE_REMOTE_DATABASE"))
+        && (remoteDatabase == null || remoteDatabase.trim().isEmpty())) {
+      throw new IllegalStateException("DATABASE_URL is required for this deployment.");
+    }
     final HistoryRepository repository = new HistoryRepository(
-        environment("DB_PATH", "./data/calculator"));
+        environment("DB_PATH", "./data/calculator"), remoteDatabase,
+        System.getenv("DATABASE_USER"), System.getenv("DATABASE_PASSWORD"));
     final HttpServer server;
     try {
       server = HttpServer.create(new InetSocketAddress(address, port), 64);

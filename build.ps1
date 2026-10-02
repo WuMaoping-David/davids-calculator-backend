@@ -2,6 +2,7 @@ param([switch]$Test)
 $ErrorActionPreference = 'Stop'
 $backendRoot = $PSScriptRoot
 $dependencies = @(
+    @{ Name = 'postgresql-42.7.13.jar'; Url = 'https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.13/postgresql-42.7.13.jar'; Sha256 = '6E0E4CC2D8CAE902084F8A2B18728B073A6FD9D1F87C9D8BFF8F298C18185B93' },
     @{ Name = 'h2-2.2.224.jar'; Url = 'https://repo.maven.apache.org/maven2/com/h2database/h2/2.2.224/h2-2.2.224.jar'; Sha256 = 'B9D8F19358ADA82A4F6EB5B174C6CFE320A375B5A9CB5A4FE456D623E6E55497' },
     @{ Name = 'gson-2.13.2.jar'; Url = 'https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.13.2/gson-2.13.2.jar'; Sha256 = 'DD0CE1B55A3ED2080CB70F9C655850CDA86C206862310009DCB5E5C95265A5E0' }
 )
