@@ -2,6 +2,12 @@
 
 ## Public deployment
 
+Verified public calculator: https://davids-calculator-frontend.onrender.com
+
+Verified API health: https://davids-calculator-backend.onrender.com/api/health
+
+Both services were live on October 2, 2026. Eleven cloud checks passed and saved history survived a Render restart.
+
 Use a Render Free Docker Web Service and a Neon Free PostgreSQL database, without a Render disk. Set `/api/health` as the health check and configure the remote database environment variables below. The Dockerfile uses Java 17, binds to `0.0.0.0`, and accepts the platform `PORT`. See [PUBLIC_DEPLOYMENT.md](PUBLIC_DEPLOYMENT.md) for the complete free deployment procedure. Local startup uses H2 when no remote URL is configured. Source publication alone does not establish public service availability.
 
 ## Project introduction
@@ -285,7 +291,7 @@ Local H2 checks are complete. PostgreSQL and public hosting require separate clo
 
 When started with `run.ps1`, logs appear in that terminal. The combined launcher instead writes logs under its root `.runtime/` directory. Stop the service before changing dependency versions or performing file-level database maintenance.
 
-For public deployment, configure a suitable interface binding, HTTPS through a hosting platform or reverse proxy, the actual frontend origin, and a remote PostgreSQL database for durable cloud history. The frontend API URL must be reachable by visitors. The local preview and repository source links do not constitute a public deployment; no public service URL is claimed here.
+For public deployment, configure a suitable interface binding, HTTPS through a hosting platform or reverse proxy, the actual frontend origin, and a remote PostgreSQL database for durable cloud history. The frontend API URL must be reachable by visitors. The verified public service addresses are listed at the beginning of this README.
 
 History is shared: there are no accounts or per-user access controls. A deployment requiring private history must add authentication and authorization. A permitted client can clear the shared database history. Stop/restart persistence is tested; it does not guarantee recovery from every hardware or power failure.
 

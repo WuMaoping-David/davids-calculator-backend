@@ -51,3 +51,7 @@ History is shared, with no user accounts. All visitors can read and delete recor
 - [Render free services](https://render.com/docs/free)
 - [Neon connections](https://neon.com/docs/connect/connect-from-any-app)
 - [PostgreSQL JDBC TLS](https://jdbc.postgresql.org/documentation/ssl/)
+
+## Verified public addresses
+
+Verified on October 2, 2026: [Calculator](https://davids-calculator-frontend.onrender.com) and [API health](https://davids-calculator-backend.onrender.com/api/health). Both Render deployments are live. Eleven cloud checks passed, and records 4 through 7 survived a confirmed Render restart. Free plan idle suspension and quotas still apply. Cloud deletion was not tested against shared live records.
